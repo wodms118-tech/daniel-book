@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>영어동화책 읽어주기</title>
+<style>
+  :root{
+    --paper:#FBF7EF; --ink:#2E2A24;
+    --forest:#3E5C46; --forest-deep:#2C4433;
+    --honey:#E8A94C; --honey-soft:#FBEED6;
+    --card:#FFFFFF; --line:#E8E0D2;
+    --muted:#8A8272; --danger:#C25B4E;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;
+    background:var(--paper);color:var(--ink);min-height:100vh;padding-bottom:80px;
+  }
+  .wrap{max-width:520px;margin:0 auto;padding:0 16px;}
+  header{padding:24px 0 14px;text-align:center;position:relative;}
+  header .moon{font-size:32px;line-height:1;}
+  header h1{font-size:20px;font-weight:800;color:var(--forest-deep);margin-top:6px;letter-spacing:-0.5px;}
+  header p{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.5;}
+  .back-btn{
+    position:absolute;left:0;top:26px;
+    border:1px solid var(--line);background:var(--card);
+    border-radius:10px;padding:8px 13px;font-size:13px;font-weight:700;color:var(--forest-deep);
+  }
+  .hidden{display:none !important;}
+
+  /* ---------- 책장 ---------- */
+  .shelf-empty{
+    text-align:center;padding:36px 20px;color:var(--muted);
+    font-size:13.5px;line-height:1.8;
+    background:var(--card);border:1px dashed var(--line);border-radius:18px;
+  }
+  .book-item{
+    display:flex;align-items:center;gap:14px;
+    background:var(--card);border:1px solid var(--line);
+    border-radius:16px;padding:12px;margin-bottom:11px;
+    box-shadow:0 1px 4px rgba(46,42,36,.04);
+  }
+  .book-item .cover{
+    width:60px;height:80px;object-fit:cover;border-radius:8px;background:#EEE7D8;flex-shrink:0;
+  }
+  .book-tap{flex:1;min-width:0;display:flex;align-items:center;gap:14px;}
+  .book-info b{display:block;font-size:15.5px;font-weight:800;color:var(--forest-deep);letter-spacing:-0.3px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:230px;}
+  .book-info span{display:block;font-size:12px;color:var(--muted);margin-top:4px;}
+  .book-del{
+    width:38px;height:38px;border-radius:10px;flex-shrink:0;
+    border:1px solid var(--line);background:var(--paper);
+    color:var(--danger);font-size:15px;
+  }
+  .new-book-btn{
+    width:100%;margin-top:14px;padding:17px;
+    border:none;border-radius:16px;
+    background:var(--forest);color:#fff;
+    font-size:16.5px;font-weight:800;
+    box-shadow:0 4px 14px rgba(62,92,70,.3);
+  }
+  .new-book-btn:active{background:var(--forest-deep);}
+
+  /* ---------- 업로드 ---------- */
+  .upload-zone{
+    border:2px dashed var(--forest);border-radius:20px;
+    background:var(--card);padding:32px 16px;text-align:center;cursor:pointer;
+  }
+  .upload-zone:active{background:var(--honey-soft);}
+  .upload-zone .cam{font-size:38px;}
+  .upload-zone b{display:block;font-size:16px;color:var(--forest-deep);margin-top:9px;}
+  .upload-zone span{display:block;font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.6;}
+  #fileInput{display:none;}
+  .sort-note{
+    display:none;margin-top:12px;font-size:12px;color:var(--muted);
+    background:var(--honey-soft);border-radius:10px;padding:9px 12px;line-height:1.55;
+  }
+  .sort-note.show{display:block;}
+  .thumbs{display:none;margin-top:14px;}
+  .thumbs.show{display:block;}
+  .thumbs-title{font-size:13.5px;font-weight:700;color:var(--forest-deep);margin-bottom:10px;}
+  .thumbs-title small{font-weight:400;color:var(--muted);margin-left:6px;}
+  .thumb-item{
+    display:flex;align-items:center;gap:12px;
+    background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:10px;margin-bottom:9px;
+  }
+  .thumb-item img{width:54px;height:72px;object-fit:cover;border-radius:8px;background:#eee;}
+  .thumb-num{
+    width:26px;height:26px;border-radius:50%;background:var(--forest);color:#fff;
+    font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .thumb-info{flex:1;font-size:12px;color:var(--muted);}
+  .tbtn{
+    width:38px;height:38px;border-radius:10px;margin-left:5px;
+    border:1px solid var(--line);background:var(--paper);
+    font-size:15px;color:var(--forest-deep);
+  }
+  .tbtn:disabled{opacity:.25;}
+  .tbtn.del{color:var(--danger);}
+  .add-more{
+    margin-top:4px;width:100%;padding:12px;
+    border:1.5px dashed var(--line);border-radius:12px;
+    background:transparent;color:var(--muted);font-size:13.5px;font-weight:600;
+  }
+  .go-btn{
+    display:none;width:100%;margin-top:14px;padding:17px;
+    border:none;border-radius:16px;background:var(--forest);color:#fff;
+    font-size:17px;font-weight:800;box-shadow:0 4px 14px rgba(62,92,70,.3);
+  }
+  .go-btn.show{display:block;}
+  .go-btn:active{background:var(--forest-deep);}
+
+  /* ---------- 진행 ---------- */
+  .progress-bar{
+    display:none;position:sticky;top:0;z-index:10;
+    background:var(--paper);padding:10px 0 8px;
+  }
+  .progress-bar.show{display:block;}
+  .pb-track{height:6px;background:var(--line);border-radius:3px;overflow:hidden;}
+  .pb-fill{height:100%;width:0%;background:var(--honey);border-radius:3px;transition:width .4s;}
+  .pb-text{font-size:11.5px;color:var(--muted);margin-top:5px;text-align:center;}
+
+  /* ---------- 결과 ---------- */
+  .page-block{margin-top:22px;}
+  .page-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;}
+  .page-head img{width:44px;height:58px;object-fit:cover;border-radius:6px;}
+  .page-head .pt{font-size:15px;font-weight:800;color:var(--forest-deep);}
+  .page-head .ps{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .page-head .zoom-hint{margin-left:auto;font-size:11px;color:var(--muted);}
+  .big-photo{
+    display:none;width:100%;border-radius:14px;margin-bottom:12px;
+    border:1px solid var(--line);cursor:pointer;
+  }
+  .big-photo.show{display:block;}
+  .status-card{
+    background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:18px;text-align:center;
+    font-size:13.5px;color:var(--muted);
+  }
+  .status-card.err{color:var(--danger);}
+  .spin{
+    display:inline-block;width:16px;height:16px;
+    border:2.5px solid var(--line);border-top-color:var(--honey);
+    border-radius:50%;animation:sp .8s linear infinite;
+    vertical-align:-3px;margin-right:7px;
+  }
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .retry-btn{
+    margin-top:12px;padding:10px 22px;
+    border:1.5px solid var(--danger);border-radius:10px;
+    background:transparent;color:var(--danger);font-size:13.5px;font-weight:700;
+  }
+  .sent-card{
+    background:var(--card);border:1px solid var(--line);
+    border-radius:16px;padding:17px 15px;margin-bottom:11px;
+    box-shadow:0 1px 4px rgba(46,42,36,.04);
+  }
+  .sent-en{font-family:Georgia,"Times New Roman",serif;font-size:16px;line-height:1.55;}
+  .sent-pron{
+    font-size:20px;font-weight:800;color:var(--forest-deep);
+    line-height:1.6;margin-top:9px;letter-spacing:-0.3px;
+    background:var(--honey-soft);border-radius:10px;padding:10px 12px;
+  }
+  .sent-ko{font-size:13.5px;color:var(--muted);margin-top:9px;line-height:1.6;}
+  .word-box{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);}
+  .word-row{display:flex;align-items:baseline;gap:8px;padding:4px 0;font-size:14px;line-height:1.5;}
+  .word-en{font-family:Georgia,serif;font-weight:700;color:var(--forest);}
+  .word-pr{color:var(--honey);font-weight:700;font-size:13px;flex-shrink:0;}
+  .word-mn{font-size:13.5px;}
+
+  /* ---------- 저장 바 ---------- */
+  .save-bar{
+    display:none;margin-top:26px;background:var(--card);
+    border:1.5px solid var(--forest);border-radius:18px;padding:18px 15px;
+  }
+  .save-bar.show{display:block;}
+  .save-bar label{font-size:13px;font-weight:700;color:var(--forest-deep);display:block;margin-bottom:8px;}
+  .save-bar input{
+    width:100%;padding:13px;border:1px solid var(--line);border-radius:12px;
+    font-size:15px;background:var(--paper);color:var(--ink);
+  }
+  .save-bar button{
+    width:100%;margin-top:11px;padding:15px;
+    border:none;border-radius:13px;background:var(--honey);color:#5A4010;
+    font-size:16px;font-weight:800;
+  }
+  .save-bar button:disabled{opacity:.5;}
+  .save-msg{font-size:12px;color:var(--muted);margin-top:9px;text-align:center;line-height:1.5;}
+  .cover-pick{display:flex;gap:8px;overflow-x:auto;padding:6px 0 2px;margin-top:6px;}
+  .cover-pick img{
+    width:52px;height:70px;object-fit:cover;border-radius:8px;
+    border:3px solid transparent;flex-shrink:0;opacity:.65;
+  }
+  .cover-pick img.sel{border-color:var(--honey);opacity:1;}
+  .sys-banner{
+    margin-top:14px;background:#FDF0E7;border:1.5px solid var(--danger);
+    border-radius:16px;padding:16px 15px;font-size:13.5px;line-height:1.7;color:var(--ink);
+  }
+  .sys-banner b{color:var(--danger);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== 화면 0: API 키 설정 ===== -->
+  <div id="viewKey" class="hidden">
+    <header>
+      <div class="moon">🔑</div>
+      <h1>처음 설정</h1>
+      <p>내 API 키로 직접 작동하는 버전이에요<br>키는 이 휴대폰 브라우저에만 저장됩니다</p>
+    </header>
+    <div class="save-bar show" style="margin-top:8px">
+      <label>Anthropic API 키</label>
+      <input type="text" id="keyInput" placeholder="sk-ant-..." autocapitalize="off" autocorrect="off">
+      <button onclick="saveKey()">저장하고 시작</button>
+      <div class="save-msg" style="text-align:left">
+        키 발급 방법:<br>
+        ① 컴퓨터/폰 브라우저로 <b>console.anthropic.com</b> 접속<br>
+        ② 로그인 → Billing에서 카드 등록(최소 $5 충전)<br>
+        ③ API Keys → Create Key → 복사해서 여기 붙여넣기<br><br>
+        비용은 쓴 만큼만 나가요 (책 1장당 몇십 원 수준)
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 화면 1: 책장 ===== -->
+  <div id="viewShelf">
+    <header>
+      <div class="moon">🌙</div>
+      <h1>내 영어책장</h1>
+      <p>저장한 책은 언제든 다시 열어 읽어줄 수 있어요</p>
+    </header>
+    <div id="shelfList"></div>
+    <button class="new-book-btn" onclick="showUpload()">＋ 새 책 만들기</button>
+    <button class="add-more" style="margin-top:10px" onclick="showKey()">🔑 API 키 변경</button>
+  </div>
+
+  <!-- ===== 화면 2: 업로드 ===== -->
+  <div id="viewUpload" class="hidden">
+    <header>
+      <button class="back-btn" onclick="goShelf()">← 책장</button>
+      <div class="moon">📷</div>
+      <h1>새 책 만들기</h1>
+      <p>책을 첫 장부터 순서대로 찍어서 올려주세요</p>
+    </header>
+    <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+      <div class="cam">📷</div>
+      <b>책 사진 올리기</b>
+      <span>여러 장 한꺼번에 선택 가능 · 장수 제한 없음<br>찍은 시간 순서로 자동 정렬돼요</span>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" multiple>
+    <div class="sort-note" id="sortNote"></div>
+    <div class="thumbs" id="thumbs">
+      <div class="thumbs-title">페이지 순서 확인 <small>▲▼로 조정</small></div>
+      <div id="thumbList"></div>
+      <button class="add-more" onclick="document.getElementById('fileInput').click()">＋ 사진 더 추가</button>
+    </div>
+    <button class="go-btn" id="goBtn" onclick="startTranslate()">📖 번역 시작</button>
+  </div>
+
+  <!-- ===== 화면 3: 결과/읽기 ===== -->
+  <div id="viewBook" class="hidden">
+    <header>
+      <button class="back-btn" onclick="goShelf()">← 책장</button>
+      <div class="moon">📖</div>
+      <h1 id="bookTitle">번역 중</h1>
+      <p id="bookSub"></p>
+    </header>
+    <div id="sysBanner" class="sys-banner hidden"></div>
+    <div class="progress-bar" id="progressBar">
+      <div class="pb-track"><div class="pb-fill" id="pbFill"></div></div>
+      <div class="pb-text" id="pbText"></div>
+    </div>
+    <div id="results"></div>
+    <div class="save-bar" id="saveBar">
+      <label>📚 책장에 저장하기 — 책 제목</label>
+      <input type="text" id="titleInput" placeholder="예: 아기곰 이야기">
+      <label style="margin-top:14px">📕 표지로 쓸 사진 선택</label>
+      <div class="cover-pick" id="coverPick"></div>
+      <button id="saveBtn" onclick="saveBook()">책장에 저장</button>
+      <div class="save-msg">저장한 책은 다시 열어도 번역을 안 해서<br>사용량이 전혀 들지 않아요</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ============ 상태 ============ */
+let apiKey = null;     // 사용자의 Anthropic API 키 (이 브라우저에만 저장)
+let pages = [];        // {dataUrl, base64, time, name}
+let bookData = null;   // 현재 보고 있는/만든 책 {title, pages:[{img, sentences, error}]}
+let coverIdx = 0;      // 표지로 선택한 페이지 번호
+let running = false;
+const CONCURRENCY = 2;
+
+/* ============ 화면 전환 ============ */
+function show(id){
+  ['viewKey','viewShelf','viewUpload','viewBook'].forEach(v =>
+    document.getElementById(v).classList.toggle('hidden', v !== id));
+  window.scrollTo(0,0);
+}
+function goShelf(){
+  if (running && !confirm('번역이 진행 중이에요. 책장으로 나가면 이번 작업은 사라져요. 나갈까요?')) return;
+  running = false;
+  show('viewShelf');
+  renderShelf();
+}
+function showUpload(){
+  pages = [];
+  document.getElementById('thumbs').classList.remove('show');
+  document.getElementById('goBtn').classList.remove('show');
+  document.getElementById('sortNote').classList.remove('show');
+  show('viewUpload');
+}
+
+/* ============ 책장 (저장소) ============ */
+function loadIndex(){
+  try { return JSON.parse(localStorage.getItem('books-index') || '[]'); }
+  catch(e){ return []; }
+}
+function renderShelf(){
+  const list = document.getElementById('shelfList');
+  const idx = loadIndex();
+  if (idx.length === 0) {
+    list.innerHTML = `<div class="shelf-empty">아직 저장된 책이 없어요 🌱<br>아래 버튼으로 첫 책을 만들어보세요</div>`;
+    return;
+  }
+  list.innerHTML = idx.map(b => `
+    <div class="book-item">
+      <div class="book-tap" onclick="openBook('${b.id}')">
+        ${b.cover ? `<img class="cover" src="${b.cover}">` : `<div class="cover"></div>`}
+        <div class="book-info">
+          <b>${esc(b.title)}</b>
+          <span>${b.pageCount}페이지 · ${b.date}</span>
+        </div>
+      </div>
+      <button class="book-del" onclick="deleteBook('${b.id}', '${esc(b.title)}')">✕</button>
+    </div>`).join('');
+}
+function deleteBook(id, title){
+  if (!confirm(`"${title}" 책을 삭제할까요? 되돌릴 수 없어요.`)) return;
+  try { localStorage.removeItem('book:' + id); } catch(e){}
+  const idx = loadIndex().filter(b => b.id !== id);
+  try { localStorage.setItem('books-index', JSON.stringify(idx)); } catch(e){}
+  renderShelf();
+}
+function openBook(id){
+  try {
+    bookData = JSON.parse(localStorage.getItem('book:' + id));
+    if (!bookData) throw new Error('없음');
+  } catch(e){
+    alert('책을 불러오지 못했어요.');
+    return;
+  }
+  document.getElementById('bookTitle').textContent = bookData.title;
+  document.getElementById('bookSub').textContent = bookData.pages.length + '페이지 · 저장된 책';
+  document.getElementById('progressBar').classList.remove('show');
+  document.getElementById('saveBar').classList.remove('show');
+  const results = document.getElementById('results');
+  results.innerHTML = '';
+  bookData.pages.forEach((p, i) => {
+    results.appendChild(buildPageBlock(i, p.img));
+    fillPageResult(i, p.sentences);
+    document.getElementById('pstat-'+i).textContent = p.sentences.length + '개 문장';
+  });
+  show('viewBook');
+}
+
+/* ============ 업로드 & 정렬 ============ */
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  const newOnes = [];
+  for (const f of files) {
+    const buf = await f.arrayBuffer();
+    const exifTime = readExifTime(buf);
+    const dataUrl = await blobToDataUrl(f);
+    const resized = await resizeImage(dataUrl, 1100, 0.8);
+    newOnes.push({
+      dataUrl: resized,
+      base64: resized.split(',')[1],
+      time: exifTime || f.lastModified || 0,
+      hasExif: !!exifTime,
+      name: f.name || ''
+    });
+  }
+  e.target.value = '';
+  pages = pages.concat(newOnes);
+  // 정렬: 촬영시간 → 파일명
+  pages.sort((a,b) => (a.time && b.time && a.time !== b.time) ? a.time - b.time
+    : String(a.name).localeCompare(String(b.name), undefined, {numeric:true}));
+  const exifCount = pages.filter(p => p.hasExif).length;
+  const note = document.getElementById('sortNote');
+  note.classList.add('show');
+  note.innerHTML = exifCount === pages.length
+    ? '✅ 찍은 시간 순서로 자동 정렬했어요. 아래에서 순서만 확인해주세요.'
+    : '⚠️ 일부 사진에 촬영 시간 정보가 없어 파일 이름순으로 배치했어요. 아래에서 순서를 꼭 확인해주세요.';
+  renderThumbs();
+});
+
+function blobToDataUrl(file){
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error('read fail'));
+    r.readAsDataURL(file);
+  });
+}
+function resizeImage(dataUrl, maxSide, quality){
+  return new Promise((res) => {
+    const img = new Image();
+    img.onload = () => {
+      let {width:w, height:h} = img;
+      if (Math.max(w,h) > maxSide) {
+        const s = maxSide / Math.max(w,h);
+        w = Math.round(w*s); h = Math.round(h*s);
+      }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      res(c.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => res(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+/* EXIF DateTimeOriginal 파서 (JPEG) */
+function readExifTime(buf){
+  try {
+    const v = new DataView(buf);
+    if (v.getUint16(0) !== 0xFFD8) return null;
+    let off = 2;
+    while (off + 4 < v.byteLength) {
+      if (v.getUint8(off) !== 0xFF) break;
+      const marker = v.getUint8(off+1);
+      const size = v.getUint16(off+2);
+      if (marker === 0xE1) {
+        // APP1 "Exif\0\0"
+        if (v.getUint32(off+4) === 0x45786966) {
+          const tiff = off + 10;
+          const little = v.getUint16(tiff) === 0x4949;
+          const g16 = p => v.getUint16(p, little);
+          const g32 = p => v.getUint32(p, little);
+          const ifd0 = tiff + g32(tiff + 4);
+          let exifIfd = 0, dt = null;
+          const n = g16(ifd0);
+          for (let i = 0; i < n; i++) {
+            const e = ifd0 + 2 + i*12;
+            const tag = g16(e);
+            if (tag === 0x8769) exifIfd = tiff + g32(e+8);
+            if (tag === 0x0132) dt = readAscii(v, tiff, e, g32);
+          }
+          if (exifIfd) {
+            const m = g16(exifIfd);
+            for (let i = 0; i < m; i++) {
+              const e = exifIfd + 2 + i*12;
+              if (g16(e) === 0x9003) { dt = readAscii(v, tiff, e, g32); break; }
+            }
+          }
+          if (dt) {
+            const mm = dt.match(/(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+            if (mm) return new Date(+mm[1], +mm[2]-1, +mm[3], +mm[4], +mm[5], +mm[6]).getTime();
+          }
+          return null;
+        }
+      }
+      off += 2 + size;
+    }
+  } catch(e){}
+  return null;
+}
+function readAscii(v, tiff, entry, g32){
+  try {
+    const count = g32(entry+4);
+    const valOff = count > 4 ? tiff + g32(entry+8) : entry + 8;
+    let s = '';
+    for (let i = 0; i < Math.min(count, 30); i++) {
+      const c = v.getUint8(valOff + i);
+      if (c === 0) break;
+      s += String.fromCharCode(c);
+    }
+    return s;
+  } catch(e){ return null; }
+}
+
+function renderThumbs(){
+  const list = document.getElementById('thumbList');
+  list.innerHTML = pages.map((p, i) => `
+    <div class="thumb-item">
+      <div class="thumb-num">${i+1}</div>
+      <img src="${p.dataUrl}">
+      <div class="thumb-info">${i+1}번째 페이지</div>
+      <div>
+        <button class="tbtn" ${i===0?'disabled':''} onclick="movePage(${i},-1)">▲</button>
+        <button class="tbtn" ${i===pages.length-1?'disabled':''} onclick="movePage(${i},1)">▼</button>
+        <button class="tbtn del" onclick="delPage(${i})">✕</button>
+      </div>
+    </div>`).join('');
+  document.getElementById('thumbs').classList.toggle('show', pages.length > 0);
+  const go = document.getElementById('goBtn');
+  go.classList.toggle('show', pages.length > 0);
+  go.textContent = `📖 번역 시작 (${pages.length}페이지)`;
+}
+function movePage(i, dir){
+  const j = i + dir;
+  if (j < 0 || j >= pages.length) return;
+  [pages[i], pages[j]] = [pages[j], pages[i]];
+  renderThumbs();
+}
+function delPage(i){ pages.splice(i, 1); renderThumbs(); }
+
+/* ============ 번역 실행 (3장 동시, 칸 고정) ============ */
+async function startTranslate(){
+  if (running || pages.length === 0) return;
+  running = true;
+  bookData = { title: '', pages: pages.map(p => ({ img: p.dataUrl, sentences: null, error: false })) };
+
+  document.getElementById('bookTitle').textContent = '번역 중...';
+  document.getElementById('bookSub').textContent = pages.length + '페이지';
+  document.getElementById('progressBar').classList.add('show');
+  document.getElementById('saveBar').classList.remove('show');
+  const results = document.getElementById('results');
+  results.innerHTML = '';
+  pages.forEach((p, i) => {
+    const block = buildPageBlock(i, p.dataUrl);
+    document.getElementById && results.appendChild(block);
+    document.getElementById('pbody-'+i).innerHTML =
+      `<div class="status-card"><span style="opacity:.5">차례를 기다리는 중이에요</span></div>`;
+  });
+  show('viewBook');
+
+  document.getElementById('sysBanner').classList.add('hidden');
+  document.getElementById('pbText').textContent = '🔌 AI 연결 점검 중...';
+  if (!await ensureConnection()) { running = false; return; }
+
+  let done = 0;
+  updateProgress(0, pages.length);
+  let next = 0;
+  const worker = async () => {
+    while (running) {
+      const i = next++;
+      if (i >= pages.length) return;
+      await processPage(i);
+      done++;
+      updateProgress(done, pages.length);
+    }
+  };
+  await Promise.all(Array.from({length: Math.min(CONCURRENCY, pages.length)}, worker));
+  if (!running) return;
+
+  const failed = bookData.pages.filter(p => p.error).length;
+  const success = bookData.pages.filter(p => p.sentences).length;
+  if (failed > 0) {
+    document.getElementById('pbText').textContent = `⚠️ ${failed}개 페이지 실패 — 각 페이지의 '다시 시도'를 눌러주세요`;
+    document.getElementById('bookTitle').textContent = '번역 완료 (일부 실패)';
+  } else {
+    document.getElementById('pbText').textContent = '✅ 모든 페이지 완료!';
+    document.getElementById('bookTitle').textContent = '번역 완료';
+  }
+  if (success > 0) {
+    document.getElementById('saveBar').classList.add('show');
+    document.getElementById('titleInput').value = suggestTitle();
+    coverIdx = 0;
+    renderCoverPick();
+  }
+  running = false;
+}
+function updateProgress(d, t){
+  document.getElementById('pbFill').style.width = (d/t*100) + '%';
+  document.getElementById('pbText').textContent = `${d} / ${t} 페이지 완료 · 끝난 페이지부터 읽어주셔도 돼요`;
+}
+function suggestTitle(){
+  for (const p of bookData.pages) {
+    if (p.sentences && p.sentences.length) {
+      const first = p.sentences[0].en.split(/\s+/).slice(0, 5).join(' ');
+      return first.replace(/[.!?,"]+$/, '');
+    }
+  }
+  return '영어동화 ' + new Date().toLocaleDateString('ko-KR');
+}
+
+function buildPageBlock(i, imgSrc){
+  const block = document.createElement('div');
+  block.className = 'page-block';
+  block.innerHTML = `
+    <div class="page-head" onclick="togglePhoto(${i})">
+      <img src="${imgSrc}">
+      <div>
+        <div class="pt">📖 ${i+1}페이지</div>
+        <div class="ps" id="pstat-${i}">대기 중</div>
+      </div>
+      <div class="zoom-hint">🔍 사진 크게</div>
+    </div>
+    <img class="big-photo" id="bigphoto-${i}" src="${imgSrc}" onclick="togglePhoto(${i})">
+    <div id="pbody-${i}"></div>`;
+  return block;
+}
+function togglePhoto(i){
+  document.getElementById('bigphoto-'+i).classList.toggle('show');
+}
+
+/* ============ 페이지 처리: 문장 추출 → 2문장씩 번역 (이어받기) ============ */
+async function processPage(i){
+  const body = document.getElementById('pbody-' + i);
+  const stat = document.getElementById('pstat-' + i);
+  try {
+    stat.textContent = '글자 읽는 중...';
+    body.innerHTML = `<div class="status-card"><span class="spin"></span>사진 속 글자를 읽고 있어요</div>`;
+
+    const sentList = await extractSentences(pages[i]);
+    if (sentList.length === 0) {
+      bookData.pages[i].sentences = [];
+      stat.textContent = '문장 없음';
+      body.innerHTML = `<div class="status-card">이 사진에서 영어 문장을 찾지 못했어요</div>`;
+      return;
+    }
+
+    const all = [];
+    for (let s = 0; s < sentList.length; s += 2) {
+      stat.textContent = `문장 ${Math.min(s+2, sentList.length)}/${sentList.length} 번역 중...`;
+      body.innerHTML = `<div class="status-card"><span class="spin"></span>문장 ${Math.min(s+2, sentList.length)} / ${sentList.length} 번역하고 있어요</div>`;
+      const chunk = sentList.slice(s, s+2);
+      let part;
+      try {
+        part = await translateChunk(chunk);
+      } catch(e) {
+        // 잘렸거나 실패하면 한 문장씩 다시
+        part = [];
+        for (const one of chunk) part.push(...await translateChunk([one]));
+      }
+      all.push(...part);
+    }
+
+    bookData.pages[i].sentences = all;
+    bookData.pages[i].error = false;
+    fillPageResult(i, all);
+    stat.textContent = all.length + '개 문장';
+  } catch (err) {
+    console.error(err);
+    bookData.pages[i].error = true;
+    stat.textContent = '오류';
+    body.innerHTML = `
+      <div class="status-card err">
+        이 페이지를 읽지 못했어요.<br>
+        <small style="color:var(--muted)">원인: ${esc(err.message || err)}</small><br>
+        <button class="retry-btn" onclick="processPage(${i})">다시 시도</button>
+      </div>`;
+  }
+}
+
+async function extractSentences(page){
+  const prompt = `사진은 영어 동화책의 한 페이지입니다. 사진 속 이야기 본문 텍스트를 문장 단위로 추출하세요.
+
+규칙:
+- 페이지 번호, 출판사, 저작권 문구는 제외
+- 책에 적힌 순서 그대로
+- 너무 긴 문장은 자연스러운 호흡 단위로 나눠도 됨
+- 영어 텍스트가 없으면 빈 배열
+
+아래 JSON만 출력 (백틱, 다른 텍스트 금지):
+{"sentences": ["문장1", "문장2"]}`;
+  // 실패 시 사진을 더 작게 줄여 한 번 더 시도
+  const sizes = [null, 700];
+  let lastErr = null;
+  for (const size of sizes) {
+    try {
+      let b64 = page.base64;
+      if (size) {
+        const smaller = await resizeImage(page.dataUrl, size, 0.7);
+        b64 = smaller.split(',')[1];
+      }
+      const data = await callImage(b64, prompt);
+      const parsed = parseJson(data);
+      if (!Array.isArray(parsed.sentences)) throw new Error('extract format');
+      return parsed.sentences.filter(s => typeof s === 'string' && s.trim());
+    } catch(e){ lastErr = e; }
+  }
+  throw lastErr;
+}
+
+async function translateChunk(sentences){
+  const prompt = `당신은 영어를 전혀 못하는 한국인 엄마가 6살 아이에게 영어 동화책을 읽어주도록 돕습니다.
+아래 영어 문장들을 처리해 JSON만 출력하세요 (백틱, 다른 텍스트 금지).
+
+문장들:
+${sentences.map((s,i)=>`${i+1}. ${s}`).join('\n')}
+
+출력 형식:
+{"items":[{"en":"원문","pron":"한글 발음","ko":"한국어 뜻 (~했어요 체, 아이에게 들려주는 따뜻한 말투)","words":[{"w":"단어","p":"한글발음","m":"뜻"}]}]}
+
+규칙:
+1. "pron"이 가장 중요. 엄마가 이것만 보고 소리내어 읽습니다. 원어민 발음에 최대한 가깝게, 연음 반영, 단어 사이 띄어쓰기로 읽기 쉽게.
+2. "words"에는 문장의 모든 단어를 빠짐없이 포함 (a, the, I, is 전부). 같은 단어가 한 문장에 두 번이면 한 번만.
+3. 단어 뜻은 그 문장 맥락 기준. 과거형이면 "갔다 (go의 과거)"처럼 원형 병기.
+4. 문장 개수와 items 개수는 반드시 동일.`;
+  const data = await callText(prompt);
+  if (data.stop_reason === 'max_tokens') throw new Error('truncated');
+  const parsed = parseJson(data);
+  if (!Array.isArray(parsed.items) || parsed.items.length !== sentences.length) throw new Error('chunk format');
+  return parsed.items;
+}
+
+/* ===== 전송 계층: 되는 방식을 자동으로 찾아 기억 ===== */
+const MODEL_CANDIDATES = ["claude-sonnet-4-6","claude-sonnet-4-5","claude-haiku-4-5","claude-3-5-sonnet-20241022"];
+let apiCfg = null;      // 성공한 {model, ver} 기억
+let selfTested = false; // 기기당 1회 점검
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+async function rawFetch(body){
+  const headers = {
+    "Content-Type": "application/json",
+    "x-api-key": apiKey || "",
+    "anthropic-version": "2023-06-01",
+    "anthropic-dangerous-direct-browser-access": "true"
+  };
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST", headers, body: JSON.stringify(body)
+  });
+  let data = null;
+  try { data = await r.json(); } catch(e){}
+  if (data && data.type === 'error') throw new Error('API: ' + ((data.error && data.error.message) || '알 수 없음'));
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  if (!data || !Array.isArray(data.content)) throw new Error('빈 응답');
+  return data;
+}
+
+async function apiCall(messages){
+  const cfgs = [];
+  if (apiCfg) cfgs.push(apiCfg);
+  for (const m of MODEL_CANDIDATES) cfgs.push({ model: m });
+  let lastErr = null;
+  for (const c of cfgs) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const data = await rawFetch({ model: c.model, max_tokens: 1600, messages });
+        if (!apiCfg || apiCfg.model !== c.model) {
+          apiCfg = c;
+          try { localStorage.setItem('api-cfg', JSON.stringify(c)); } catch(e){}
+        }
+        return data;
+      } catch(e) {
+        lastErr = e;
+        const msg = String(e.message || e);
+        if (/overload|529|rate|timeout|network|fetch/i.test(msg) && attempt === 0) { await sleep(1200); continue; }
+        break; // 형식/거절 오류 → 다음 설정으로
+      }
+    }
+  }
+  throw lastErr || new Error('연결 실패');
+}
+
+async function callText(prompt){
+  return await apiCall([{ role: "user", content: [{ type: "text", text: prompt }] }]);
+}
+
+async function callImage(b64, prompt){
+  const shapes = [
+    [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } }, { type: "text", text: prompt }],
+    [{ type: "text", text: prompt }, { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } }]
+  ];
+  let lastErr = null;
+  for (const content of shapes) {
+    try { return await apiCall([{ role: "user", content }]); }
+    catch(e){ lastErr = e; }
+  }
+  throw lastErr;
+}
+
+function tinyJpeg(){
+  const c = document.createElement('canvas');
+  c.width = 32; c.height = 32;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,32,32);
+  ctx.fillStyle = '#000'; ctx.fillRect(8,8,16,16);
+  return c.toDataURL('image/jpeg', 0.6).split(',')[1];
+}
+
+function showBanner(html){
+  const b = document.getElementById('sysBanner');
+  b.innerHTML = html;
+  b.classList.remove('hidden');
+  document.getElementById('progressBar').classList.remove('show');
+}
+
+async function ensureConnection(){
+  if (selfTested) return true;
+  try {
+    await callText('아래 JSON만 출력하세요: {"ok":1}');
+  } catch(e) {
+    const msg = String(e.message || e);
+    if (/401|invalid|authentication|x-api-key/i.test(msg)) {
+      showBanner(`⚠️ <b>API 키가 올바르지 않아요.</b><br>
+        아래로 돌아가 책장 화면의 <b>🔑 API 키 변경</b>을 눌러 키를 다시 확인해주세요.<br>
+        <small>원인: ${esc(msg)}</small>`);
+    } else if (/credit|billing|balance/i.test(msg)) {
+      showBanner(`⚠️ <b>잔액이 부족해요.</b><br>
+        console.anthropic.com → Billing에서 충전 후 다시 시도해주세요.<br>
+        <small>원인: ${esc(msg)}</small>`);
+    } else {
+      showBanner(`⚠️ <b>연결에 실패했어요.</b><br>
+        인터넷 연결을 확인하고 다시 시도해주세요.<br>
+        <small>원인: ${esc(msg)}</small>`);
+    }
+    return false;
+  }
+  selfTested = true;
+  return true;
+}
+
+function parseJson(data){
+  const text = data.content.filter(b => b.type === 'text').map(b => b.text || '').join('\n');
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start === -1 || end === -1) throw new Error('JSON 없음: ' + text.slice(0, 100));
+  return JSON.parse(text.slice(start, end + 1));
+}
+
+function fillPageResult(i, sentences){
+  const body = document.getElementById('pbody-' + i);
+  if (!sentences || sentences.length === 0) {
+    body.innerHTML = `<div class="status-card">이 사진에서 영어 문장을 찾지 못했어요</div>`;
+    return;
+  }
+  body.innerHTML = sentences.map(s => `
+    <div class="sent-card">
+      <div class="sent-en">${esc(s.en)}</div>
+      <div class="sent-pron">🗣 ${esc(s.pron)}</div>
+      <div class="sent-ko">💬 ${esc(s.ko)}</div>
+      <div class="word-box">
+        ${(s.words||[]).map(w => `
+          <div class="word-row">
+            <span class="word-en">${esc(w.w)}</span>
+            <span class="word-pr">(${esc(w.p)})</span>
+            <span class="word-mn">${esc(w.m)}</span>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+/* ============ 표지 선택 ============ */
+function renderCoverPick(){
+  const box = document.getElementById('coverPick');
+  box.innerHTML = bookData.pages.map((p, i) =>
+    `<img src="${p.img}" class="${i === coverIdx ? 'sel' : ''}" onclick="pickCover(${i})">`
+  ).join('');
+}
+function pickCover(i){
+  coverIdx = i;
+  renderCoverPick();
+}
+
+/* ============ 저장 ============ */
+async function saveBook(){
+  const btn = document.getElementById('saveBtn');
+  const title = document.getElementById('titleInput').value.trim() || '영어동화';
+  btn.disabled = true;
+  btn.textContent = '저장 중...';
+  try {
+    const id = String(Date.now());
+    // 저장용으로 사진 압축 (휴대폰 저장 공간 절약)
+    const storedPages = [];
+    for (const p of bookData.pages) {
+      storedPages.push({
+        img: await resizeImage(p.img, 480, 0.5),
+        sentences: p.sentences || []
+      });
+    }
+    const cover = await resizeImage(bookData.pages[coverIdx].img, 120, 0.5);
+    const payload = JSON.stringify({ title, pages: storedPages });
+    try {
+      localStorage.setItem('book:' + id, payload);
+    } catch(e) {
+      alert('휴대폰 저장 공간이 가득 찼어요. 책장에서 안 보는 책을 삭제한 뒤 다시 저장해주세요.');
+      btn.disabled = false; btn.textContent = '책장에 저장';
+      return;
+    }
+    const idx = loadIndex();
+    idx.unshift({
+      id, title,
+      pageCount: storedPages.length,
+      date: new Date().toLocaleDateString('ko-KR', {month:'numeric', day:'numeric'}),
+      cover
+    });
+    localStorage.setItem('books-index', JSON.stringify(idx));
+    alert('📚 책장에 저장했어요!');
+    goShelf();
+  } catch(e){
+    console.error(e);
+    alert('저장에 실패했어요. 인터넷 연결을 확인하고 다시 눌러주세요.');
+  }
+  btn.disabled = false;
+  btn.textContent = '책장에 저장';
+}
+
+function esc(s){
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ============ 키 관리 ============ */
+function showKey(){
+  document.getElementById('keyInput').value = apiKey || '';
+  show('viewKey');
+}
+function saveKey(){
+  const k = document.getElementById('keyInput').value.trim();
+  if (!k) { alert('키를 입력해주세요.'); return; }
+  if (!k.startsWith('sk-ant')) {
+    if (!confirm('보통 키는 sk-ant로 시작해요. 이대로 저장할까요?')) return;
+  }
+  apiKey = k;
+  selfTested = false;
+  try { localStorage.setItem('anthropic-key', k); } catch(e){}
+  goShelf();
+}
+
+/* ============ 시작 ============ */
+try { apiKey = localStorage.getItem('anthropic-key'); } catch(e){}
+try { const c = localStorage.getItem('api-cfg'); if (c) apiCfg = JSON.parse(c); } catch(e){}
+if (apiKey) { renderShelf(); }
+else { show('viewKey'); }
+</script>
+</body>
+</html>
