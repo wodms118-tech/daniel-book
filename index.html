@@ -619,10 +619,10 @@ async function processPage(i){
     }
 
     const all = [];
-    for (let s = 0; s < sentList.length; s += 2) {
-      stat.textContent = `문장 ${Math.min(s+2, sentList.length)}/${sentList.length} 번역 중...`;
-      body.innerHTML = `<div class="status-card"><span class="spin"></span>문장 ${Math.min(s+2, sentList.length)} / ${sentList.length} 번역하고 있어요</div>`;
-      const chunk = sentList.slice(s, s+2);
+    for (let s = 0; s < sentList.length; s += 1) {
+      stat.textContent = `문장 ${s+1}/${sentList.length} 번역 중...`;
+      body.innerHTML = `<div class="status-card"><span class="spin"></span>문장 ${s+1} / ${sentList.length} 번역하고 있어요</div>`;
+      const chunk = sentList.slice(s, s+1);
       let part;
       try {
         part = await translateChunk(chunk);
@@ -652,16 +652,16 @@ async function processPage(i){
 }
 
 async function extractSentences(page){
-  const prompt = `사진은 영어 동화책의 한 페이지입니다. 사진 속 이야기 본문 텍스트를 문장 단위로 추출하세요.
-
-규칙:
+  const baseRules = `규칙:
 - 페이지 번호, 출판사, 저작권 문구는 제외
 - 책에 적힌 순서 그대로
 - 너무 긴 문장은 자연스러운 호흡 단위로 나눠도 됨
 - 영어 텍스트가 없으면 빈 배열
+- 페이지의 모든 문장을 다 담지 못할 것 같으면, 담을 수 있는 만큼만 완결된 JSON으로 출력하고 "more": true 를 추가
 
 아래 JSON만 출력 (백틱, 다른 텍스트 금지):
-{"sentences": ["문장1", "문장2"]}`;
+{"sentences": ["문장1", "문장2"], "more": false}`;
+
   // 실패 시 사진을 더 작게 줄여 한 번 더 시도
   const sizes = [null, 700];
   let lastErr = null;
@@ -672,35 +672,80 @@ async function extractSentences(page){
         const smaller = await resizeImage(page.dataUrl, size, 0.7);
         b64 = smaller.split(',')[1];
       }
-      const data = await callImage(b64, prompt);
-      const parsed = parseJson(data);
-      if (!Array.isArray(parsed.sentences)) throw new Error('extract format');
-      return parsed.sentences.filter(s => typeof s === 'string' && s.trim());
+      // 이어받기: 문장이 많아 한 번에 다 못 뽑으면 이어서 계속 요청 (최대 8회 = 문장 수백 개)
+      const all = [];
+      for (let round = 0; round < 8; round++) {
+        const prompt = round === 0
+          ? `사진은 영어 동화책의 한 페이지입니다. 사진 속 이야기 본문 텍스트를 문장 단위로 추출하세요.\n\n${baseRules}`
+          : `사진은 영어 동화책의 한 페이지입니다. 이 페이지의 문장을 앞에서부터 추출하는 중인데, 아래 문장까지 이미 추출했습니다:\n"${all[all.length-1]}"\n\n그 문장 바로 다음 문장부터 이어서 추출하세요. 이미 추출한 문장은 다시 포함하지 마세요.\n\n${baseRules}`;
+        const data = await callImage(b64, prompt);
+        let parsed;
+        try {
+          parsed = parseJson(data);
+        } catch(pe) {
+          // JSON이 중간에 끊긴 경우: 완성된 문장만 건져내고 이어받기
+          const raw = data.content.filter(b => b.type === 'text').map(b => b.text || '').join('\n');
+          const saved = salvageSentences(raw);
+          if (saved.length === 0) throw pe;
+          parsed = { sentences: saved, more: true };
+        }
+        if (!Array.isArray(parsed.sentences)) throw new Error('extract format');
+        const clean = parsed.sentences.filter(s => typeof s === 'string' && s.trim());
+        all.push(...clean);
+        const cut = data.stop_reason === 'max_tokens'; // 답변이 한도에 걸려 끊긴 경우
+        if (!parsed.more && !cut) break;               // 다 뽑았으면 종료
+        if (clean.length === 0) break;                 // 더 없다는 뜻
+      }
+      // 중복 제거(이어받기 경계에서 같은 문장이 겹칠 수 있음)
+      return all.filter((s, i) => all.indexOf(s) === i);
     } catch(e){ lastErr = e; }
   }
   throw lastErr;
 }
 
+// 끊긴 JSON 텍스트에서 따옴표가 완전히 닫힌 문장만 회수
+function salvageSentences(text){
+  const i = text.indexOf('[');
+  if (i === -1) return [];
+  const seg = text.slice(i);
+  const out = [];
+  const re = /"((?:[^"\\]|\\.)*)"/g;
+  let m;
+  while ((m = re.exec(seg))) out.push(m[1]);
+  return out.filter(s => s && s !== 'more' && s !== 'sentences' && s.trim().length > 1);
+}
+
 async function translateChunk(sentences){
   const prompt = `당신은 영어를 전혀 못하는 한국인 엄마가 6살 아이에게 영어 동화책을 읽어주도록 돕습니다.
-아래 영어 문장들을 처리해 JSON만 출력하세요 (백틱, 다른 텍스트 금지).
+아래 영어 문장을 처리해 JSON만 출력하세요 (백틱, 다른 텍스트, 설명 금지. 반드시 완결된 JSON으로 끝맺을 것).
 
-문장들:
+문장:
 ${sentences.map((s,i)=>`${i+1}. ${s}`).join('\n')}
 
-출력 형식:
-{"items":[{"en":"원문","pron":"한글 발음","ko":"한국어 뜻 (~했어요 체, 아이에게 들려주는 따뜻한 말투)","words":[{"w":"단어","p":"한글발음","m":"뜻"}]}]}
+출력 형식 (짧고 간결하게, 절대 중간에 끊기지 않도록):
+{"items":[{"en":"원문","pron":"한글 발음","ko":"한국어 뜻(간결하게, ~했어요 체)","words":[{"w":"단어","p":"발음","m":"뜻(5단어 이내로 짧게)"}]}]}
 
 규칙:
-1. "pron"이 가장 중요. 엄마가 이것만 보고 소리내어 읽습니다. 원어민 발음에 최대한 가깝게, 연음 반영, 단어 사이 띄어쓰기로 읽기 쉽게.
-2. "words"에는 문장의 모든 단어를 빠짐없이 포함 (a, the, I, is 전부). 같은 단어가 한 문장에 두 번이면 한 번만.
-3. 단어 뜻은 그 문장 맥락 기준. 과거형이면 "갔다 (go의 과거)"처럼 원형 병기.
-4. 문장 개수와 items 개수는 반드시 동일.`;
-  const data = await callText(prompt);
-  if (data.stop_reason === 'max_tokens') throw new Error('truncated');
-  const parsed = parseJson(data);
-  if (!Array.isArray(parsed.items) || parsed.items.length !== sentences.length) throw new Error('chunk format');
-  return parsed.items;
+1. "pron"이 가장 중요. 원어민 발음에 가깝게, 연음 반영, 띄어쓰기로 읽기 쉽게.
+2. "words"에는 문장의 모든 단어 포함(a, the, I, is 전부), 같은 단어 중복 시 한 번만.
+3. 단어 뜻은 간결하게 5단어 이내. 과거형이면 "갔다(go과거)"처럼 짧게 병기.
+4. 문장 개수와 items 개수는 반드시 동일.
+5. 절대 문장 중간이나 단어 중간에서 끊지 말고, JSON 중괄호를 완전히 닫아서 끝낼 것.`;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const data = await callText(prompt);
+      if (data.stop_reason === 'max_tokens') throw new Error('truncated');
+      const parsed = parseJson(data);
+      if (!Array.isArray(parsed.items) || parsed.items.length !== sentences.length) throw new Error('chunk format');
+      // 단어 사이 잘림 방지: 발음에 영문 알파벳이 섞여 있으면 잘린 것으로 간주해 재시도
+      const broken = parsed.items.some(it => /[a-zA-Z]/.test(it.pron || ''));
+      if (broken && attempt === 0) throw new Error('pron truncated');
+      return parsed.items;
+    } catch(e) {
+      if (attempt === 1) throw e;
+    }
+  }
 }
 
 /* ===== 전송 계층: 되는 방식을 자동으로 찾아 기억 ===== */
@@ -736,7 +781,7 @@ async function apiCall(messages){
   for (const c of cfgs) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const data = await rawFetch({ model: c.model, max_tokens: 1600, messages });
+        const data = await rawFetch({ model: c.model, max_tokens: 2200, messages });
         if (!apiCfg || apiCfg.model !== c.model) {
           apiCfg = c;
           try { localStorage.setItem('api-cfg', JSON.stringify(c)); } catch(e){}
