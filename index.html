@@ -199,9 +199,37 @@
     border-radius:16px;padding:16px 15px;font-size:13.5px;line-height:1.7;color:var(--ink);
   }
   .sys-banner b{color:var(--danger);}
+  .modal-bg{
+    display:none;position:fixed;inset:0;background:rgba(46,42,36,.45);
+    z-index:100;align-items:flex-end;justify-content:center;
+  }
+  .modal-bg.show{display:flex;}
+  .modal-box{
+    width:100%;max-width:520px;background:var(--card);
+    border-radius:20px 20px 0 0;padding:22px 20px 28px;
+    animation:modalUp .2s ease-out;
+  }
+  @keyframes modalUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+  .modal-msg{font-size:15px;line-height:1.6;color:var(--ink);white-space:pre-line;margin-bottom:18px;}
+  .modal-btns{display:flex;gap:10px;}
+  .modal-btns button{
+    flex:1;padding:14px;border-radius:13px;font-size:15px;font-weight:700;border:none;
+  }
+  .modal-cancel{background:var(--paper);color:var(--muted);border:1px solid var(--line) !important;}
+  .modal-ok{background:var(--forest);color:#fff;}
+  .modal-ok.danger{background:var(--danger);}
 </style>
 </head>
 <body>
+<div class="modal-bg" id="modalBg">
+  <div class="modal-box">
+    <div class="modal-msg" id="modalMsg"></div>
+    <div class="modal-btns">
+      <button class="modal-cancel" id="modalCancel">취소</button>
+      <button class="modal-ok" id="modalOk">확인</button>
+    </div>
+  </div>
+</div>
 <div class="wrap">
 
   <!-- ===== 화면 0: API 키 설정 ===== -->
@@ -235,6 +263,7 @@
     <div id="shelfList"></div>
     <button class="new-book-btn" onclick="showUpload()">＋ 새 책 만들기</button>
     <button class="add-more" style="margin-top:10px" onclick="showKey()">🔑 API 키 변경</button>
+    <button class="add-more" style="margin-top:8px;color:var(--danger);border-color:var(--danger)" onclick="clearAllBooks()">🗑 책장 전체 비우기 (용량 부족할 때)</button>
   </div>
 
   <!-- ===== 화면 2: 업로드 ===== -->
@@ -289,6 +318,40 @@
 <script>
 /* ============ 상태 ============ */
 let apiKey = null;     // 사용자의 Anthropic API 키 (이 브라우저에만 저장)
+
+/* ============ 화면 내장 확인창 (독립 실행 모드에서 confirm/alert가 막히는 문제 대응) ============ */
+function showConfirm(msg, okText, danger){
+  return new Promise((resolve) => {
+    const bg = document.getElementById('modalBg');
+    document.getElementById('modalMsg').textContent = msg;
+    const ok = document.getElementById('modalOk');
+    const cancel = document.getElementById('modalCancel');
+    ok.textContent = okText || '확인';
+    ok.className = 'modal-ok' + (danger ? ' danger' : '');
+    cancel.style.display = '';
+    bg.classList.add('show');
+    const cleanup = (result) => {
+      bg.classList.remove('show');
+      ok.onclick = null; cancel.onclick = null;
+      resolve(result);
+    };
+    ok.onclick = () => cleanup(true);
+    cancel.onclick = () => cleanup(false);
+  });
+}
+function showAlert(msg){
+  return new Promise((resolve) => {
+    const bg = document.getElementById('modalBg');
+    document.getElementById('modalMsg').textContent = msg;
+    const ok = document.getElementById('modalOk');
+    const cancel = document.getElementById('modalCancel');
+    ok.textContent = '확인';
+    ok.className = 'modal-ok';
+    cancel.style.display = 'none';
+    bg.classList.add('show');
+    ok.onclick = () => { bg.classList.remove('show'); ok.onclick = null; resolve(); };
+  });
+}
 let pages = [];        // {dataUrl, base64, time, name}
 let bookData = null;   // 현재 보고 있는/만든 책 {title, pages:[{img, sentences, error}]}
 let coverIdx = 0;      // 표지로 선택한 페이지 번호
@@ -301,8 +364,8 @@ function show(id){
     document.getElementById(v).classList.toggle('hidden', v !== id));
   window.scrollTo(0,0);
 }
-function goShelf(){
-  if (running && !confirm('번역이 진행 중이에요. 책장으로 나가면 이번 작업은 사라져요. 나갈까요?')) return;
+async function goShelf(){
+  if (running && !(await showConfirm('번역이 진행 중이에요. 책장으로 나가면 이번 작업은 사라져요. 나갈까요?', '나가기', true))) return;
   running = false;
   show('viewShelf');
   renderShelf();
@@ -339,19 +402,21 @@ function renderShelf(){
       <button class="book-del" onclick="deleteBook('${b.id}', '${esc(b.title)}')">✕</button>
     </div>`).join('');
 }
-function deleteBook(id, title){
-  if (!confirm(`"${title}" 책을 삭제할까요? 되돌릴 수 없어요.`)) return;
-  try { localStorage.removeItem('book:' + id); } catch(e){}
+async function deleteBook(id, title){
+  if (!(await showConfirm(`"${title}" 책을 삭제할까요?\n되돌릴 수 없어요.`, '삭제', true))) return;
+  let ok = true;
+  try { localStorage.removeItem('book:' + id); } catch(e){ ok = false; }
   const idx = loadIndex().filter(b => b.id !== id);
-  try { localStorage.setItem('books-index', JSON.stringify(idx)); } catch(e){}
+  try { localStorage.setItem('books-index', JSON.stringify(idx)); } catch(e){ ok = false; }
   renderShelf();
+  if (!ok) await showAlert('삭제 중 문제가 있었어요. 그래도 목록은 갱신했어요.');
 }
-function openBook(id){
+async function openBook(id){
   try {
     bookData = JSON.parse(localStorage.getItem('book:' + id));
     if (!bookData) throw new Error('없음');
   } catch(e){
-    alert('책을 불러오지 못했어요.');
+    await showAlert('책을 불러오지 못했어요.');
     return;
   }
   document.getElementById('bookTitle').textContent = bookData.title;
@@ -916,13 +981,32 @@ async function saveBook(){
     }
     const cover = await resizeImage(bookData.pages[coverIdx].img, 120, 0.5);
     const payload = JSON.stringify({ title, pages: storedPages });
-    try {
-      localStorage.setItem('book:' + id, payload);
-    } catch(e) {
-      alert('휴대폰 저장 공간이 가득 찼어요. 책장에서 안 보는 책을 삭제한 뒤 다시 저장해주세요.');
-      btn.disabled = false; btn.textContent = '책장에 저장';
-      return;
+
+    let saved = trySet('book:' + id, payload);
+    if (!saved) {
+      // 용량 부족: 오래된 책부터 정리하고 다시 시도할지 물어봄
+      const doClean = await showConfirm(
+        '휴대폰 저장 공간이 가득 찼어요.\n오래된 책부터 자동으로 정리하고 다시 저장할까요?',
+        '정리하고 저장', true
+      );
+      if (!doClean) {
+        btn.disabled = false; btn.textContent = '책장에 저장';
+        return;
+      }
+      let idxWork = loadIndex();
+      while (!saved && idxWork.length > 0) {
+        const oldest = idxWork.pop(); // 목록 맨 뒤 = 가장 오래된 책
+        try { localStorage.removeItem('book:' + oldest.id); } catch(e){}
+        try { localStorage.setItem('books-index', JSON.stringify(idxWork)); } catch(e){}
+        saved = trySet('book:' + id, payload);
+      }
+      if (!saved) {
+        await showAlert('공간을 정리해도 저장이 안 돼요. 사진 장수를 줄여서 다시 시도해주세요.');
+        btn.disabled = false; btn.textContent = '책장에 저장';
+        return;
+      }
     }
+
     const idx = loadIndex();
     idx.unshift({
       id, title,
@@ -931,14 +1015,34 @@ async function saveBook(){
       cover
     });
     localStorage.setItem('books-index', JSON.stringify(idx));
-    alert('📚 책장에 저장했어요!');
+    await showAlert('📚 책장에 저장했어요!');
     goShelf();
   } catch(e){
     console.error(e);
-    alert('저장에 실패했어요. 인터넷 연결을 확인하고 다시 눌러주세요.');
+    await showAlert('저장에 실패했어요. 인터넷 연결을 확인하고 다시 눌러주세요.');
   }
   btn.disabled = false;
   btn.textContent = '책장에 저장';
+}
+function trySet(key, val){
+  try { localStorage.setItem(key, val); return true; }
+  catch(e){ return false; }
+}
+
+/* ============ 책장 전체 비우기 ============ */
+async function clearAllBooks(){
+  const ok = await showConfirm(
+    '책장에 저장된 책을 전부 지울까요?\n(API 키는 그대로 남아요)\n되돌릴 수 없어요.',
+    '전부 지우기', true
+  );
+  if (!ok) return;
+  try {
+    const idx = loadIndex();
+    idx.forEach(b => { try { localStorage.removeItem('book:' + b.id); } catch(e){} });
+    localStorage.removeItem('books-index');
+  } catch(e){}
+  renderShelf();
+  await showAlert('책장을 비웠어요.');
 }
 
 function esc(s){
@@ -950,11 +1054,11 @@ function showKey(){
   document.getElementById('keyInput').value = apiKey || '';
   show('viewKey');
 }
-function saveKey(){
+async function saveKey(){
   const k = document.getElementById('keyInput').value.trim();
-  if (!k) { alert('키를 입력해주세요.'); return; }
+  if (!k) { await showAlert('키를 입력해주세요.'); return; }
   if (!k.startsWith('sk-ant')) {
-    if (!confirm('보통 키는 sk-ant로 시작해요. 이대로 저장할까요?')) return;
+    if (!(await showConfirm('보통 키는 sk-ant로 시작해요.\n이대로 저장할까요?', '저장'))) return;
   }
   apiKey = k;
   selfTested = false;
